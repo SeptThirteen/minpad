@@ -12,9 +12,11 @@ import java.util.Map;
 public class ActionExecutor {
     
     private Map<Integer, ActionConfig> actionMap;
+    private AudioVolumeController audioController;
     
     public ActionExecutor() {
         actionMap = new HashMap<>();
+        audioController = new AudioVolumeController();
         initializeDefaultActions();
     }
     
@@ -42,6 +44,22 @@ public class ActionExecutor {
             @Override
             public void execute() {
                 showNotification("MinPad", "这是一个测试通知！");
+            }
+        });
+        
+        // NumPad +: 增加音量（默认）
+        actionMap.put(10, new ActionConfig("增加音量", null) {
+            @Override
+            public void execute() {
+                audioController.volumeUp();
+            }
+        });
+        
+        // NumPad -: 减少音量（默认）
+        actionMap.put(11, new ActionConfig("减少音量", null) {
+            @Override
+            public void execute() {
+                audioController.volumeDown();
             }
         });
     }

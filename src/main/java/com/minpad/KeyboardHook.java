@@ -9,6 +9,15 @@ import com.sun.jna.platform.win32.WinDef.WPARAM;
 import com.sun.jna.platform.win32.WinUser;
 import com.sun.jna.platform.win32.WinUser.KBDLLHOOKSTRUCT;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 
 /**
@@ -19,6 +28,8 @@ public class KeyboardHook {
     private static final int WH_KEYBOARD_LL = 13;
     private static final int WM_KEYDOWN = 0x0100;
     private static final int WM_SYSKEYDOWN = 0x0104;
+    private static final int WM_KEYUP = 0x0101;
+    private static final int WM_SYSKEYUP = 0x0105;
     private static final int VK_NUMPAD0 = 0x60;
     private static final int VK_NUMPAD1 = 0x61;
     private static final int VK_NUMPAD2 = 0x62;
@@ -44,6 +55,13 @@ public class KeyboardHook {
     private Thread hookThread;
     private volatile boolean running;
     private int threadId;
+    private final Set<Integer> pressedKeys = ConcurrentHashMap.newKeySet();
+    private final Map<Integer, ScheduledFuture<?>> repeatTasks = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService repeatExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "minpad-key-repeat");
+        t.setDaemon(true);
+        return t;
+    });
 
     public KeyboardHook(IntConsumer onKey) {
         this.onKey = onKey;
@@ -76,16 +94,27 @@ public class KeyboardHook {
             if (nCode >= 0) {
                 int vkCode = info.vkCode;
                 int msg = wParam.intValue();
+                Integer actionIndex = mapVkToAction(vkCode, info.flags);
+
+                // 只处理数字键盘映射，其它键直接放行
+                if (actionIndex == null) {
+                    return User32.INSTANCE.CallNextHookEx(
+                        hHook,
+                        nCode,
+                        wParam,
+                        new com.sun.jna.platform.win32.WinDef.LPARAM(Pointer.nativeValue(info.getPointer())));
+                }
+
                 if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
-                    Integer actionIndex = mapVkToAction(vkCode, info.flags);
-                    if (actionIndex != null) {
-                        try {
-                            onKey.accept(actionIndex);
-                        } catch (Exception ignored) {
-                            // 防止回调异常导致输入阻塞
-                        }
-                        return new LRESULT(1); // 吞掉事件
+                    // 首次按下才触发，屏蔽系统自动重复
+                    if (pressedKeys.add(vkCode)) {
+                        trigger(actionIndex, vkCode);
                     }
+                    return new LRESULT(1); // 吞掉数字键盘事件
+                } else if (msg == WM_KEYUP || msg == WM_SYSKEYUP) {
+                    pressedKeys.remove(vkCode);
+                    stopRepeat(vkCode);
+                    return new LRESULT(1); // 同样吞掉
                 }
             }
                 return User32.INSTANCE.CallNextHookEx(
@@ -112,6 +141,14 @@ public class KeyboardHook {
             User32.INSTANCE.UnhookWindowsHookEx(hHook);
             hHook = null;
         }
+
+        // 退出时清理重复任务
+        repeatTasks.values().forEach(f -> {
+            if (f != null) {
+                f.cancel(true);
+            }
+        });
+        repeatExecutor.shutdownNow();
     }
 
     /** 将虚拟键码映射到动作索引。返回 null 表示不处理。 */
@@ -153,6 +190,41 @@ public class KeyboardHook {
                 return null;
             default:
                 return null;
+        }
+    }
+
+    /**
+     * 触发一次动作；对 + / - 支持长按循环，其他键仅一次。
+     */
+    private void trigger(Integer actionIndex, int vkCode) {
+        if (actionIndex == null) return;
+
+        // 先立即执行一次
+        try {
+            onKey.accept(actionIndex);
+        } catch (Exception ignored) {
+            // 防止回调异常导致输入阻塞
+        }
+
+        // 仅对 NumPad + / - 做长按循环
+        if (vkCode == VK_ADD || vkCode == VK_SUBTRACT) {
+            ScheduledFuture<?> future = repeatExecutor.scheduleAtFixedRate(() -> {
+                try {
+                    onKey.accept(actionIndex);
+                } catch (Exception ignored) {
+                }
+            }, 150, 120, TimeUnit.MILLISECONDS); // 150ms 后开始，每 120ms 重复
+            repeatTasks.put(vkCode, future);
+        }
+    }
+
+    /**
+     * 停止对应按键的长按循环。
+     */
+    private void stopRepeat(int vkCode) {
+        ScheduledFuture<?> future = repeatTasks.remove(vkCode);
+        if (future != null) {
+            future.cancel(true);
         }
     }
 }

@@ -94,15 +94,62 @@ public class SettingsDialog extends JDialog {
         infoPanel.add(cmdLabel);
         panel.add(infoPanel, BorderLayout.CENTER);
         
-        // 右侧：编辑按钮
+        // 右侧：编辑按钮和重置按钮
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        
         JButton editButton = new JButton("编辑");
         editButton.addActionListener(e -> editAction(keyIndex, keyName, nameLabel, cmdLabel));
-        panel.add(editButton, BorderLayout.EAST);
+        buttonPanel.add(editButton);
+        
+        // 只有NumPad +和- 可以重置为默认的音量控制
+        if (keyIndex == 10 || keyIndex == 11) {
+            JButton resetButton = new JButton("重置");
+            resetButton.addActionListener(e -> resetToDefault(keyIndex, nameLabel, cmdLabel));
+            buttonPanel.add(resetButton);
+        }
+        
+        panel.add(buttonPanel, BorderLayout.EAST);
         
         return panel;
     }
     
+    private void resetToDefault(int keyIndex, JLabel nameLabel, JLabel cmdLabel) {
+        ActionExecutor.ActionConfig defaultAction;
+        if (keyIndex == 10) {
+            defaultAction = new ActionExecutor.ActionConfig("增加音量", null);
+        } else {
+            defaultAction = new ActionExecutor.ActionConfig("减少音量", null);
+        }
+        
+        actionExecutor.setAction(keyIndex, defaultAction);
+        nameLabel.setText("名称: " + defaultAction.getName());
+        cmdLabel.setText("命令: 无");
+        
+        JOptionPane.showMessageDialog(this,
+                "已重置为默认音量控制功能！",
+                "重置成功",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+    
     private void editAction(int keyIndex, String keyName, JLabel nameLabel, JLabel cmdLabel) {
+        // 音量控制键的特殊处理
+        if (keyIndex == 10 || keyIndex == 11) {
+            String currentName = nameLabel.getText().replace("名称: ", "");
+            int option = JOptionPane.showConfirmDialog(this,
+                    "是否使用默认的音量控制功能？\n\n" +
+                    "当前功能: " + currentName + "\n" +
+                    "NumPad + : 增加音量\n" +
+                    "NumPad - : 减少音量\n\n" +
+                    "点击\"是\"使用音量控制，\"否\"自定义其他功能",
+                    "配置 " + keyName,
+                    JOptionPane.YES_NO_OPTION);
+            
+            if (option == JOptionPane.YES_OPTION) {
+                resetToDefault(keyIndex, nameLabel, cmdLabel);
+                return;
+            }
+        }
+        
         JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
         
@@ -129,9 +176,9 @@ public class SettingsDialog extends JDialog {
         panel.add(new JLabel("参数:"));
         panel.add(argumentField);
         
-        int result = JOptionPane.showConfirmDialog(this, panel, 
-            "编辑 " + keyName + " 快捷键", 
-            JOptionPane.OK_CANCEL_OPTION, 
+        int result = JOptionPane.showConfirmDialog(this, panel,
+            "编辑 " + keyName + " 快捷键",
+            JOptionPane.OK_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE);
         
         if (result == JOptionPane.OK_OPTION) {
@@ -141,8 +188,8 @@ public class SettingsDialog extends JDialog {
             
             if (!name.isEmpty() && !command.isEmpty()) {
                 ActionExecutor.ActionConfig newAction = new ActionExecutor.ActionConfig(
-                    name, 
-                    command, 
+                    name,
+                    command,
                     argument.isEmpty() ? null : argument
                 );
                 actionExecutor.setAction(keyIndex, newAction);
@@ -151,14 +198,14 @@ public class SettingsDialog extends JDialog {
                 nameLabel.setText("名称: " + name);
                 cmdLabel.setText("命令: " + command);
                 
-                JOptionPane.showMessageDialog(this, 
-                    "快捷键配置已更新！", 
-                    "成功", 
+                JOptionPane.showMessageDialog(this,
+                    "快捷键配置已更新！",
+                    "成功",
                     JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(this, 
-                    "名称和命令不能为空！", 
-                    "错误", 
+                JOptionPane.showMessageDialog(this,
+                    "名称和命令不能为空！",
+                    "错误",
                     JOptionPane.ERROR_MESSAGE);
             }
         }

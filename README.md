@@ -21,7 +21,9 @@
 | NumPad 4 | 打开资源管理器 |
 | NumPad 5 | 打开命令提示符 |
 | NumPad 6-9 | 可自定义 |
-| NumPad + - * / | 可自定义 |
+| NumPad + | 增加音量（默认）/ 可自定义 |
+| NumPad - | 减少音量（默认）/ 可自定义 |
+| NumPad * / | 可自定义 |
 | NumPad Enter | 可自定义 |
 
 ## 系统要求
@@ -63,6 +65,7 @@ java -jar target/minpad-1.0.0.jar
    - **名称**：操作的描述性名称
    - **命令**：要执行的程序路径（如 `notepad.exe`、`C:\Program Files\xxx\app.exe`）
    - **参数**：可选，传递给程序的参数
+5. 对于 NumPad + 和 NumPad -，可以选择"重置"按钮恢复默认的音量控制功能
 
 ### 示例配置
 
