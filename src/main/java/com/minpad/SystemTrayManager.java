@@ -2,8 +2,11 @@ package com.minpad;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 /**
  * 系统托盘管理器
@@ -14,6 +17,8 @@ public class SystemTrayManager {
     private TrayIcon trayIcon;
     private NumPadListener listener;
     private KeyboardHook keyboardHook;
+    private JPopupMenu swingMenu;
+    private JWindow popupWindow;
     
     public SystemTrayManager(NumPadListener listener, KeyboardHook keyboardHook) {
         this.listener = listener;
@@ -32,12 +37,31 @@ public class SystemTrayManager {
         try {
             SystemTray tray = SystemTray.getSystemTray();
             Image image = createTrayIcon();
-            
-            PopupMenu popup = createPopupMenu();
-            trayIcon = new TrayIcon(image, "MinPad - 数字键盘快捷工具", popup);
+
+            swingMenu = createSwingMenu();
+            popupWindow = new JWindow();
+            popupWindow.setAlwaysOnTop(true);
+            popupWindow.setSize(1, 1);
+
+            trayIcon = new TrayIcon(image, "MinPad - 数字键盘快捷工具");
             trayIcon.setImageAutoSize(true);
-            
-            // 双击托盘图标显示设置
+
+            trayIcon.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    if (e.isPopupTrigger() || e.getButton() == MouseEvent.BUTTON3) {
+                        showSwingMenu(e.getX(), e.getY());
+                    }
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    if (e.isPopupTrigger() || e.getButton() == MouseEvent.BUTTON3) {
+                        showSwingMenu(e.getX(), e.getY());
+                    }
+                }
+            });
+            // 左键双击仍然打开设置
             trayIcon.addActionListener(e -> showSettings());
             
             tray.add(trayIcon);
@@ -79,31 +103,83 @@ public class SystemTrayManager {
         g.dispose();
         return image;
     }
+
+    /**
+     * 从常用字体中选择一个可用的中文字体，避免方框。
+     */
+    private Font pickFont() {
+        String[] candidates = {
+                "Microsoft YaHei UI",
+                "Microsoft YaHei",
+                "SimSun",
+                "Segoe UI",
+                "Arial Unicode MS",
+                "Dialog" // JVM 默认对话字体
+        };
+        String[] available = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+        for (String name : candidates) {
+            for (String avail : available) {
+                if (avail.equalsIgnoreCase(name)) {
+                    System.out.println("Tray menu font: " + avail);
+                    return new Font(avail, Font.PLAIN, 12);
+                }
+            }
+        }
+        System.out.println("Tray menu font fallback: " + Font.SANS_SERIF);
+        return new Font(Font.SANS_SERIF, Font.PLAIN, 12);
+    }
     
     /**
      * 创建右键菜单
      */
-    private PopupMenu createPopupMenu() {
-        PopupMenu popup = new PopupMenu();
-        
-        // 设置菜单
-        MenuItem settingsItem = new MenuItem("设置快捷键...");
+    private JPopupMenu createSwingMenu() {
+        JPopupMenu menu = new JPopupMenu();
+        Font popupFont = pickFont();
+        menu.setFont(popupFont);
+
+        JMenuItem settingsItem = new JMenuItem("设置快捷键...");
+        settingsItem.setFont(popupFont);
         settingsItem.addActionListener(e -> showSettings());
-        popup.add(settingsItem);
-        
-        // 关于菜单
-        MenuItem aboutItem = new MenuItem("关于");
+        menu.add(settingsItem);
+
+        JMenuItem aboutItem = new JMenuItem("关于");
+        aboutItem.setFont(popupFont);
         aboutItem.addActionListener(e -> showAbout());
-        popup.add(aboutItem);
-        
-        popup.addSeparator();
-        
-        // 退出菜单
-        MenuItem exitItem = new MenuItem("退出");
+        menu.add(aboutItem);
+
+        menu.addSeparator();
+
+        JMenuItem exitItem = new JMenuItem("退出");
+        exitItem.setFont(popupFont);
         exitItem.addActionListener(e -> exit());
-        popup.add(exitItem);
-        
-        return popup;
+        menu.add(exitItem);
+
+        return menu;
+    }
+
+    private void showSwingMenu(int x, int y) {
+        SwingUtilities.invokeLater(() -> {
+            if (swingMenu == null || popupWindow == null) {
+                return;
+            }
+            popupWindow.setLocation(x, y);
+            popupWindow.setVisible(true);
+            swingMenu.addPopupMenuListener(new PopupMenuListener() {
+                @Override
+                public void popupMenuWillBecomeVisible(PopupMenuEvent e) { }
+
+                @Override
+                public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                    popupWindow.setVisible(false);
+                }
+
+                @Override
+                public void popupMenuCanceled(PopupMenuEvent e) {
+                    popupWindow.setVisible(false);
+                }
+            });
+            swingMenu.show(popupWindow.getContentPane(), 0, 0);
+        });
     }
     
     /**
