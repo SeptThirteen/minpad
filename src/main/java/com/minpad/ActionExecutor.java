@@ -17,6 +17,18 @@ public class ActionExecutor {
     public ActionExecutor() {
         actionMap = new HashMap<>();
         audioController = new AudioVolumeController();
+        
+        // 尝试从保存的配置加载，如果没有则使用默认配置
+        if (ConfigManager.configExists()) {
+            Map<Integer, ActionConfig> loadedConfig = ConfigManager.loadConfig();
+            if (!loadedConfig.isEmpty()) {
+                actionMap.putAll(loadedConfig);
+                initializeSpecialActions();
+                return;
+            }
+        }
+        
+        // 使用默认配置
         initializeDefaultActions();
     }
     
@@ -48,28 +60,34 @@ public class ActionExecutor {
         });
         
         // NumPad +: 增加音量（默认）
-        actionMap.put(10, new ActionConfig("增加音量", null) {
-            @Override
-            public void execute() {
-                audioController.volumeUp();
-            }
-        });
+        actionMap.put(10, new ActionConfig("增加音量", "__volume_up"));
         
         // NumPad -: 减少音量（默认）
-        actionMap.put(11, new ActionConfig("减少音量", null) {
-            @Override
-            public void execute() {
-                audioController.volumeDown();
-            }
-        });
+        actionMap.put(11, new ActionConfig("减少音量", "__volume_down"));
         
         // NumPad Enter: 播放/暂停（默认）
-        actionMap.put(14, new ActionConfig("播放/暂停", null) {
-            @Override
-            public void execute() {
-                audioController.playPause();
-            }
-        });
+        actionMap.put(14, new ActionConfig("播放/暂停", "__play_pause"));
+        
+        initializeSpecialActions();
+    }
+    
+    /**
+     * 初始化特殊命令的处理
+     */
+    private void initializeSpecialActions() {
+        // 为特殊命令设置执行逻辑
+        if (actionMap.get(10) != null) {
+            ActionConfig config = actionMap.get(10);
+            config.setAudioController(audioController);
+        }
+        if (actionMap.get(11) != null) {
+            ActionConfig config = actionMap.get(11);
+            config.setAudioController(audioController);
+        }
+        if (actionMap.get(14) != null) {
+            ActionConfig config = actionMap.get(14);
+            config.setAudioController(audioController);
+        }
     }
     
     /**
@@ -136,6 +154,7 @@ public class ActionExecutor {
         private String command;
         private String argument;
         private String keyCombination;  // 组合键，如 "ctrl+shift+a"
+        private transient AudioVolumeController audioController;  // 不序列化
         
         public ActionConfig(String name, String command) {
             this(name, command, null, null);
@@ -153,6 +172,20 @@ public class ActionExecutor {
         }
         
         public void execute() throws IOException {
+            // 处理特殊命令
+            if (command != null && command.startsWith("__")) {
+                if ("__volume_up".equals(command) && audioController != null) {
+                    audioController.volumeUp();
+                    return;
+                } else if ("__volume_down".equals(command) && audioController != null) {
+                    audioController.volumeDown();
+                    return;
+                } else if ("__play_pause".equals(command) && audioController != null) {
+                    audioController.playPause();
+                    return;
+                }
+            }
+            
             // 如果配置了组合键，优先执行组合键
             if (keyCombination != null && !keyCombination.isEmpty()) {
                 KeyCombinationController controller = new KeyCombinationController();
@@ -202,6 +235,10 @@ public class ActionExecutor {
         
         public void setKeyCombination(String keyCombination) {
             this.keyCombination = keyCombination;
+        }
+        
+        public void setAudioController(AudioVolumeController audioController) {
+            this.audioController = audioController;
         }
     }
 }

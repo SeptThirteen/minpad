@@ -199,6 +199,9 @@ public class SystemTrayManager {
                 JOptionPane.YES_NO_OPTION);
         
         if (result == JOptionPane.YES_OPTION) {
+            // 保存配置
+            ConfigManager.saveConfig(listener.getActionExecutor().getAllActions());
+            
             if (trayIcon != null) {
                 SystemTray.getSystemTray().remove(trayIcon);
             }

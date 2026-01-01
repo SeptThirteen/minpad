@@ -127,16 +127,20 @@ public class SettingsDialog extends JDialog {
     private void resetToDefault(int keyIndex, JLabel nameLabel, JLabel cmdLabel) {
         ActionExecutor.ActionConfig defaultAction;
         if (keyIndex == 10) {
-            defaultAction = new ActionExecutor.ActionConfig("增加音量", null);
+            defaultAction = new ActionExecutor.ActionConfig("增加音量", "__volume_up");
         } else if (keyIndex == 11) {
-            defaultAction = new ActionExecutor.ActionConfig("减少音量", null);
+            defaultAction = new ActionExecutor.ActionConfig("减少音量", "__volume_down");
         } else if (keyIndex == 14) {
-            defaultAction = new ActionExecutor.ActionConfig("播放/暂停", null);
+            defaultAction = new ActionExecutor.ActionConfig("播放/暂停", "__play_pause");
         } else {
             return;
         }
         
         actionExecutor.setAction(keyIndex, defaultAction);
+        
+        // 立即保存配置
+        ConfigManager.saveConfig(actionExecutor.getAllActions());
+        
         nameLabel.setText("名称: " + defaultAction.getName());
         cmdLabel.setText("命令: 无");
         
@@ -249,6 +253,8 @@ public class SettingsDialog extends JDialog {
                 );
                 actionExecutor.setAction(keyIndex, newAction);
 
+                // 立即保存配置
+                ConfigManager.saveConfig(actionExecutor.getAllActions());
                 
                 // 更新显示
                 nameLabel.setText("名称: " + name);
@@ -256,7 +262,7 @@ public class SettingsDialog extends JDialog {
                 keyComboLabel.setText("组合键: " + (keyCombo.isEmpty() ? "无" : keyCombo));
                 
                 JOptionPane.showMessageDialog(this,
-                    "快捷键配置已更新！",
+                    "快捷键配置已更新并保存！",
                     "成功",
                     JOptionPane.INFORMATION_MESSAGE);
             } else {
