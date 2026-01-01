@@ -62,6 +62,14 @@ public class ActionExecutor {
                 audioController.volumeDown();
             }
         });
+        
+        // NumPad Enter: 播放/暂停（默认）
+        actionMap.put(14, new ActionConfig("播放/暂停", null) {
+            @Override
+            public void execute() {
+                audioController.playPause();
+            }
+        });
     }
     
     /**
@@ -127,18 +135,32 @@ public class ActionExecutor {
         private String name;
         private String command;
         private String argument;
+        private String keyCombination;  // 组合键，如 "ctrl+shift+a"
         
         public ActionConfig(String name, String command) {
-            this(name, command, null);
+            this(name, command, null, null);
         }
         
         public ActionConfig(String name, String command, String argument) {
+            this(name, command, argument, null);
+        }
+        
+        public ActionConfig(String name, String command, String argument, String keyCombination) {
             this.name = name;
             this.command = command;
             this.argument = argument;
+            this.keyCombination = keyCombination;
         }
         
         public void execute() throws IOException {
+            // 如果配置了组合键，优先执行组合键
+            if (keyCombination != null && !keyCombination.isEmpty()) {
+                KeyCombinationController controller = new KeyCombinationController();
+                controller.executeKeyCombination(keyCombination);
+                return;
+            }
+            
+            // 否则执行命令
             if (command != null) {
                 ProcessBuilder pb;
                 if (argument != null) {
@@ -162,6 +184,10 @@ public class ActionExecutor {
             return argument;
         }
         
+        public String getKeyCombination() {
+            return keyCombination;
+        }
+        
         public void setName(String name) {
             this.name = name;
         }
@@ -172,6 +198,10 @@ public class ActionExecutor {
         
         public void setArgument(String argument) {
             this.argument = argument;
+        }
+        
+        public void setKeyCombination(String keyCombination) {
+            this.keyCombination = keyCombination;
         }
     }
 }

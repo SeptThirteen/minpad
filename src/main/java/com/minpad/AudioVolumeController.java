@@ -15,6 +15,7 @@ public class AudioVolumeController {
     private static final int VK_VOLUME_UP = 0xAF;      // 音量上升键
     private static final int VK_VOLUME_DOWN = 0xAE;    // 音量下降键
     private static final int VK_VOLUME_MUTE = 0xAD;    // 静音键
+    private static final int VK_MEDIA_PLAY_PAUSE = 0xB3;  // 播放/暂停键
     private static final int VOLUME_STEPS = 1;         // 每次按压的次数
 
     private User32 user32;
@@ -46,6 +47,13 @@ public class AudioVolumeController {
      */
     public void toggleMute() {
         simulateKeyPress(VK_VOLUME_MUTE);
+    }
+
+    /**
+     * 播放/暂停
+     */
+    public void playPause() {
+        simulateKeyPress(VK_MEDIA_PLAY_PAUSE);
     }
 
     /**
