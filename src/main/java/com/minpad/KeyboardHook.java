@@ -44,7 +44,7 @@ public class KeyboardHook {
     private static final int VK_ADD = 0x6B;
     private static final int VK_SEPARATOR = 0x6C; // rarely used
     private static final int VK_SUBTRACT = 0x6D;
-    private static final int VK_DECIMAL = 0x6E; // not used here
+    private static final int VK_DECIMAL = 0x6E;
     private static final int VK_DIVIDE = 0x6F;
     private static final int VK_RETURN = 0x0D;
 
@@ -188,6 +188,8 @@ public class KeyboardHook {
                     return 14;
                 }
                 return null;
+            case VK_DECIMAL:
+                return 15;
             default:
                 return null;
         }

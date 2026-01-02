@@ -64,7 +64,7 @@ public class NumPadListener implements NativeKeyListener {
         if (rawCode == 96 || rawCode == 97 || rawCode == 98 || rawCode == 99 ||
             rawCode == 100 || rawCode == 101 || rawCode == 102 || rawCode == 103 ||
             rawCode == 104 || rawCode == 105 || rawCode == 106 || rawCode == 107 ||
-            rawCode == 109 || rawCode == 111 || rawCode == 13) {
+            rawCode == 109 || rawCode == 110 || rawCode == 111 || rawCode == 13) {
             return;
         }
         
@@ -111,6 +111,9 @@ public class NumPadListener implements NativeKeyListener {
                 break;
             case 13: // NumPad Enter
                 handleAction(14, "NumPad Enter");
+                break;
+            case 110: // NumPad . (Decimal)
+                handleAction(15, "NumPad .");
                 break;
         }
     }

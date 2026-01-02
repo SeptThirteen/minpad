@@ -62,7 +62,8 @@ public class SettingsDialog extends JDialog {
         String[] keyNames = {
             "NumPad 0", "NumPad 1", "NumPad 2", "NumPad 3", "NumPad 4",
             "NumPad 5", "NumPad 6", "NumPad 7", "NumPad 8", "NumPad 9",
-            "NumPad +", "NumPad -", "NumPad *", "NumPad /", "NumPad Enter"
+            "NumPad +", "NumPad -", "NumPad *", "NumPad /", "NumPad Enter",
+            "NumPad ."
         };
         
         for (int i = 0; i < keyNames.length; i++) {
