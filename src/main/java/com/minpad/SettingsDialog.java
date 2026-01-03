@@ -3,21 +3,31 @@ package com.minpad;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
  * 设置对话框
  * 允许用户配置数字键盘快捷键
+ * 使用物理键盘布局的可视化界面
  */
 public class SettingsDialog extends JDialog {
     
     private ActionExecutor actionExecutor;
+    private Map<Integer, JButton> keyButtons = new HashMap<>();
+    
+    // 颜色定义
+    private static final Color CONFIGURED_COLOR = new Color(41, 98, 255);  // 深蓝色
+    private static final Color UNCONFIGURED_COLOR = new Color(189, 189, 189);  // 灰色
+    private static final Color HOVER_COLOR = new Color(100, 149, 237);  // 悬停时的蓝色
     
     public SettingsDialog(ActionExecutor actionExecutor) {
         this.actionExecutor = actionExecutor;
         
         setTitle("MinPad - 快捷键设置");
-        setSize(600, 500);
+        setSize(500, 450);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setIconImage(createSettingsIcon());
@@ -28,22 +38,35 @@ public class SettingsDialog extends JDialog {
     private void initUI() {
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
+        mainPanel.setBackground(new Color(245, 245, 245));
         
         // 标题
-        JLabel titleLabel = new JLabel("配置数字键盘快捷操作");
+        JLabel titleLabel = new JLabel("数字键盘快捷键配置");
         titleLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 16));
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         
-        // 快捷键列表
-        JPanel listPanel = createKeyListPanel();
-        mainPanel.add(new JScrollPane(listPanel), BorderLayout.CENTER);
+        // 键盘布局面板
+        JPanel keyboardPanel = createKeyboardLayoutPanel();
+        mainPanel.add(keyboardPanel, BorderLayout.CENTER);
+        
+        // 提示信息
+        JLabel hintLabel = new JLabel("双击按键编辑配置 | 悬停查看详情");
+        hintLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 11));
+        hintLabel.setForeground(Color.GRAY);
+        hintLabel.setHorizontalAlignment(SwingConstants.CENTER);
         
         // 按钮面板
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(hintLabel, BorderLayout.CENTER);
+        
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton closeButton = new JButton("关闭");
         closeButton.addActionListener(e -> dispose());
         buttonPanel.add(closeButton);
-        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
         
         add(mainPanel);
     }
@@ -55,132 +78,220 @@ public class SettingsDialog extends JDialog {
         return IconFactory.createMinPadIcon(32);
     }
     
-    private JPanel createKeyListPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+    /**
+     * 创建物理键盘布局面板
+     */
+    private JPanel createKeyboardLayoutPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(new Color(245, 245, 245));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(3, 3, 3, 3);
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
         
-        String[] keyNames = {
-            "NumPad 0", "NumPad 1", "NumPad 2", "NumPad 3", "NumPad 4",
-            "NumPad 5", "NumPad 6", "NumPad 7", "NumPad 8", "NumPad 9",
-            "NumPad +", "NumPad -", "NumPad *", "NumPad /", "NumPad Enter",
-            "NumPad ."
-        };
+        // 第一行: NumLock | / | * | -
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.gridheight = 1;
+        panel.add(createDisabledKey("Num"), gbc);
         
-        for (int i = 0; i < keyNames.length; i++) {
-            final int keyIndex = i;
-            JPanel itemPanel = createKeyItemPanel(keyIndex, keyNames[i]);
-            panel.add(itemPanel);
-            panel.add(Box.createVerticalStrut(5));
-        }
+        gbc.gridx = 1;
+        panel.add(createKeyButton(13, "/"), gbc);
+        
+        gbc.gridx = 2;
+        panel.add(createKeyButton(12, "*"), gbc);
+        
+        gbc.gridx = 3;
+        panel.add(createKeyButton(11, "-"), gbc);
+        
+        // 第二行: 7 | 8 | 9 | + (加号占两行)
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.gridheight = 1;
+        panel.add(createKeyButton(7, "7"), gbc);
+        
+        gbc.gridx = 1;
+        panel.add(createKeyButton(8, "8"), gbc);
+        
+        gbc.gridx = 2;
+        panel.add(createKeyButton(9, "9"), gbc);
+        
+        gbc.gridx = 3; gbc.gridheight = 2;  // + 占两行
+        panel.add(createKeyButton(10, "+"), gbc);
+        
+        // 第三行: 4 | 5 | 6
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.gridheight = 1;
+        panel.add(createKeyButton(4, "4"), gbc);
+        
+        gbc.gridx = 1;
+        panel.add(createKeyButton(5, "5"), gbc);
+        
+        gbc.gridx = 2;
+        panel.add(createKeyButton(6, "6"), gbc);
+        
+        // 第四行: 1 | 2 | 3 | Enter (Enter占两行)
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1; gbc.gridheight = 1;
+        panel.add(createKeyButton(1, "1"), gbc);
+        
+        gbc.gridx = 1;
+        panel.add(createKeyButton(2, "2"), gbc);
+        
+        gbc.gridx = 2;
+        panel.add(createKeyButton(3, "3"), gbc);
+        
+        gbc.gridx = 3; gbc.gridheight = 2;  // Enter 占两行
+        panel.add(createKeyButton(14, "Enter"), gbc);
+        
+        // 第五行: 0 (占两格) | .
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2; gbc.gridheight = 1;
+        panel.add(createKeyButton(0, "0"), gbc);
+        
+        gbc.gridx = 2; gbc.gridwidth = 1;
+        panel.add(createKeyButton(15, "."), gbc);
         
         return panel;
     }
     
-    private JPanel createKeyItemPanel(int keyIndex, String keyName) {
-        JPanel panel = new JPanel(new BorderLayout(10, 5));
-        panel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Color.LIGHT_GRAY),
-            new EmptyBorder(10, 10, 10, 10)
-        ));
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
-        
-        // 左侧：键名
-        JLabel keyLabel = new JLabel(keyName);
-        keyLabel.setFont(new Font("Consolas", Font.BOLD, 14));
-        keyLabel.setPreferredSize(new Dimension(100, 20));
-        panel.add(keyLabel, BorderLayout.WEST);
-        
-        // 中间：当前配置
-        JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+    /**
+     * 创建不可配置的按键（如NumLock）
+     */
+    private JButton createDisabledKey(String label) {
+        JButton button = new JButton(label);
+        button.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
+        button.setBackground(new Color(220, 220, 220));
+        button.setForeground(Color.GRAY);
+        button.setEnabled(false);
+        button.setFocusPainted(false);
+        return button;
+    }
+    
+    /**
+     * 创建可配置的按键按钮
+     */
+    private JButton createKeyButton(int keyIndex, String keyLabel) {
         ActionExecutor.ActionConfig action = actionExecutor.getAction(keyIndex);
+        String displayName = action != null ? action.getName() : "未设置";
         
-        JLabel nameLabel = new JLabel("名称: " + (action != null ? action.getName() : "未配置"));
-        JLabel cmdLabel = new JLabel("命令: " + (action != null && action.getCommand() != null ? action.getCommand() : "无"));
-        JLabel keyComboLabel = new JLabel("组合键: " + (action != null && action.getKeyCombination() != null ? action.getKeyCombination() : "无"));
-        nameLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
-        cmdLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
-        keyComboLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
+        // 根据配置状态选择文字颜色
+        String labelColor = action != null ? "#666666" : "#666666";  // 已配置:浅蓝灰色, 未配置:深灰
+        String nameColor = action != null ? "#333333" : "#333333";   // 已配置:蓝色, 未配置:深色
         
-        infoPanel.add(nameLabel);
-        infoPanel.add(cmdLabel);
-        infoPanel.add(keyComboLabel);
-        panel.add(infoPanel, BorderLayout.CENTER);
+        // 构建多行显示：上方键位标签，下方功能名称
+        String buttonText = "<html><div style='text-align: center;'>" +
+            "<span style='font-size: 9px; color: " + labelColor + ";'>" + keyLabel + "</span><br>" +
+            "<span style='font-size: 9px; font-weight: bold; color: " + nameColor + ";'>" + displayName + "</span>" +
+            "</div></html>";
         
-        // 右侧：编辑按钮和重置按钮
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        JButton button = new JButton(buttonText);
+        button.setFont(new Font("Microsoft YaHei", Font.PLAIN, 11));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
         
-        JButton editButton = new JButton("编辑");
-        editButton.addActionListener(e -> editAction(keyIndex, keyName, nameLabel, cmdLabel, keyComboLabel));
-        buttonPanel.add(editButton);
+        // 设置初始颜色
+        updateButtonColor(button, action);
         
-        // NumPad +/- 和 Enter 可以重置为默认控制
-        if (keyIndex == 10 || keyIndex == 11 || keyIndex == 14) {
-            JButton resetButton = new JButton("重置");
-            resetButton.addActionListener(e -> resetToDefault(keyIndex, nameLabel, cmdLabel));
-            buttonPanel.add(resetButton);
-        }
+        // 设置Tooltip显示完整配置
+        updateButtonTooltip(button, keyIndex, keyLabel, action);
         
-        panel.add(buttonPanel, BorderLayout.EAST);
+        // 鼠标悬停效果
+        button.addMouseListener(new MouseAdapter() {
+            private Color originalColor;
+            
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                originalColor = button.getBackground();
+                button.setBackground(HOVER_COLOR);
+            }
+            
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (originalColor != null) {
+                    button.setBackground(originalColor);
+                }
+            }
+            
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {  // 双击编辑
+                    editAction(keyIndex, keyLabel, button);
+                }
+            }
+        });
         
-        return panel;
+        keyButtons.put(keyIndex, button);
+        return button;
     }
     
-    private void resetToDefault(int keyIndex, JLabel nameLabel, JLabel cmdLabel) {
-        ActionExecutor.ActionConfig defaultAction;
-        if (keyIndex == 10) {
-            defaultAction = new ActionExecutor.ActionConfig("增加音量", "__volume_up");
-        } else if (keyIndex == 11) {
-            defaultAction = new ActionExecutor.ActionConfig("减少音量", "__volume_down");
-        } else if (keyIndex == 14) {
-            defaultAction = new ActionExecutor.ActionConfig("播放/暂停", "__play_pause");
+    /**
+     * 更新按钮颜色和文本
+     */
+    private void updateButtonColor(JButton button, ActionExecutor.ActionConfig action) {
+        if (action != null) {
+            button.setBackground(CONFIGURED_COLOR);
+            button.setForeground(Color.WHITE);
+            button.setOpaque(true);
         } else {
-            return;
+            button.setBackground(UNCONFIGURED_COLOR);
+            button.setForeground(Color.DARK_GRAY);
+            button.setOpaque(true);
         }
-        
-        actionExecutor.setAction(keyIndex, defaultAction);
-        
-        // 立即保存配置
-        ConfigManager.saveConfig(actionExecutor.getAllActions());
-        
-        nameLabel.setText("名称: " + defaultAction.getName());
-        cmdLabel.setText("命令: 无");
-        
-        String feature = keyIndex == 14 ? "播放/暂停" : "音量控制";
-        JOptionPane.showMessageDialog(this,
-                "已重置为默认" + feature + "功能！",
-                "重置成功",
-                JOptionPane.INFORMATION_MESSAGE);
     }
     
-    private void editAction(int keyIndex, String keyName, JLabel nameLabel, JLabel cmdLabel, JLabel keyComboLabel) {
+    /**
+     * 更新按钮的Tooltip
+     */
+    private void updateButtonTooltip(JButton button, int keyIndex, String keyLabel, ActionExecutor.ActionConfig action) {
+        if (action != null) {
+            StringBuilder tooltip = new StringBuilder("<html>");
+            tooltip.append("<b>").append(keyLabel).append("</b><br>");
+            tooltip.append("名称: ").append(action.getName()).append("<br>");
+            if (action.getCommand() != null) {
+                tooltip.append("命令: ").append(action.getCommand()).append("<br>");
+            }
+            if (action.getArgument() != null) {
+                tooltip.append("参数: ").append(action.getArgument()).append("<br>");
+            }
+            if (action.getKeyCombination() != null) {
+                tooltip.append("组合键: ").append(action.getKeyCombination()).append("<br>");
+            }
+            tooltip.append("</html>");
+            button.setToolTipText(tooltip.toString());
+        } else {
+            button.setToolTipText("<html><b>" + keyLabel + "</b><br>未配置<br>双击编辑</html>");
+        }
+    }
+    
+    /**
+     * 编辑按键配置
+     */
+    private void editAction(int keyIndex, String keyLabel, JButton button) {
         // 音量控制键和Enter键的特殊处理
         if (keyIndex == 10 || keyIndex == 11) {
-            String currentName = nameLabel.getText().replace("名称: ", "");
+            ActionExecutor.ActionConfig currentAction = actionExecutor.getAction(keyIndex);
+            String currentName = currentAction != null ? currentAction.getName() : "未设置";
             int option = JOptionPane.showConfirmDialog(this,
                     "是否使用默认的音量控制功能？\n\n" +
                     "当前功能: " + currentName + "\n" +
                     "NumPad + : 增加音量\n" +
                     "NumPad - : 减少音量\n\n" +
                     "点击\"是\"使用音量控制，\"否\"自定义其他功能",
-                    "配置 " + keyName,
+                    "配置 " + keyLabel,
                     JOptionPane.YES_NO_OPTION);
             
             if (option == JOptionPane.YES_OPTION) {
-                resetToDefault(keyIndex, nameLabel, cmdLabel);
+                resetToDefault(keyIndex, button);
                 return;
             }
         } else if (keyIndex == 14) {
-            String currentName = nameLabel.getText().replace("名称: ", "");
+            ActionExecutor.ActionConfig currentAction = actionExecutor.getAction(keyIndex);
+            String currentName = currentAction != null ? currentAction.getName() : "未设置";
             int option = JOptionPane.showConfirmDialog(this,
                     "是否使用默认的播放/暂停功能？\n\n" +
                     "当前功能: " + currentName + "\n" +
                     "NumPad Enter: 播放/暂停音乐\n\n" +
                     "点击\"是\"使用播放/暂停，\"否\"自定义其他功能",
-                    "配置 " + keyName,
+                    "配置 " + keyLabel,
                     JOptionPane.YES_NO_OPTION);
             
             if (option == JOptionPane.YES_OPTION) {
-                resetToDefault(keyIndex, nameLabel, cmdLabel);
+                resetToDefault(keyIndex, button);
                 return;
             }
         }
@@ -235,7 +346,7 @@ public class SettingsDialog extends JDialog {
         
         int result = JOptionPane.showConfirmDialog(this, 
             new Object[]{panel, infoPanel},
-            "编辑 " + keyName + " 快捷键",
+            "编辑 " + keyLabel + " 快捷键",
             JOptionPane.OK_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE);
         
@@ -257,10 +368,14 @@ public class SettingsDialog extends JDialog {
                 // 立即保存配置
                 ConfigManager.saveConfig(actionExecutor.getAllActions());
                 
-                // 更新显示
-                nameLabel.setText("名称: " + name);
-                cmdLabel.setText("命令: " + (command.isEmpty() ? "无" : command));
-                keyComboLabel.setText("组合键: " + (keyCombo.isEmpty() ? "无" : keyCombo));
+                // 更新按钮显示
+                String buttonText = "<html><div style='text-align: center;'>" +
+                    "<span style='font-size: 9px; color: #E8F0FF;'>" + keyLabel + "</span><br>" +
+                    "<span style='font-size: 12px; font-weight: bold; color: #FFFFFF;'>" + name + "</span>" +
+                    "</div></html>";
+                button.setText(buttonText);
+                updateButtonColor(button, newAction);
+                updateButtonTooltip(button, keyIndex, keyLabel, newAction);
                 
                 JOptionPane.showMessageDialog(this,
                     "快捷键配置已更新并保存！",
@@ -273,5 +388,46 @@ public class SettingsDialog extends JDialog {
                     JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+    
+    /**
+     * 重置为默认配置
+     */
+    private void resetToDefault(int keyIndex, JButton button) {
+        ActionExecutor.ActionConfig defaultAction;
+        String keyLabel;
+        
+        if (keyIndex == 10) {
+            defaultAction = new ActionExecutor.ActionConfig("增加音量", "__volume_up");
+            keyLabel = "+";
+        } else if (keyIndex == 11) {
+            defaultAction = new ActionExecutor.ActionConfig("减少音量", "__volume_down");
+            keyLabel = "-";
+        } else if (keyIndex == 14) {
+            defaultAction = new ActionExecutor.ActionConfig("播放/暂停", "__play_pause");
+            keyLabel = "Enter";
+        } else {
+            return;
+        }
+        
+        actionExecutor.setAction(keyIndex, defaultAction);
+        
+        // 立即保存配置
+        ConfigManager.saveConfig(actionExecutor.getAllActions());
+        
+        // 更新按钮显示
+        String buttonText = "<html><div style='text-align: center;'>" +
+            "<span style='font-size: 9px; color: #E8F0FF;'>" + keyLabel + "</span><br>" +
+            "<span style='font-size: 12px; font-weight: bold; color: #FFFFFF;'>" + defaultAction.getName() + "</span>" +
+            "</div></html>";
+        button.setText(buttonText);
+        updateButtonColor(button, defaultAction);
+        updateButtonTooltip(button, keyIndex, keyLabel, defaultAction);
+        
+        String feature = keyIndex == 14 ? "播放/暂停" : "音量控制";
+        JOptionPane.showMessageDialog(this,
+                "已重置为默认" + feature + "功能！",
+                "重置成功",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 }
