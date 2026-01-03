@@ -209,6 +209,10 @@ public class SystemTrayManager {
             if (keyboardHook != null) {
                 keyboardHook.stop();
             }
+            
+            // 释放单实例锁
+            SingleInstanceLock.releaseLock();
+            
             System.exit(0);
         }
     }
