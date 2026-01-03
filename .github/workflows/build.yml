@@ -7,25 +7,105 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  build:
+  # Linux 构建：生成跨平台 JAR
+  build-jar:
     runs-on: ubuntu-latest
+    name: Build JAR (Linux)
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 11
-          cache: maven  # 启用 Maven 依赖缓存
+          java-version: 17
+          cache: maven
 
-      - name: Build with Maven
-        run: mvn -B clean package
+      - name: Build JAR with Maven
+        run: mvn -B clean package -DskipTests
 
-      - name: Upload artifact (JAR)
+      - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: minpad-jar
-          path: target/*.jar
+          path: target/minpad.jar
+          retention-days: 30
+
+  # Windows 构建：生成 exe 可执行程序
+  build-exe:
+    runs-on: windows-latest
+    name: Build EXE (Windows)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Build JAR with Maven
+        run: mvn -B clean package -DskipTests
+
+      - name: Generate executable with jpackage
+        run: |
+          jpackage --input target `
+            --name MinPad `
+            --main-jar minpad.jar `
+            --main-class com.minpad.Main `
+            --type app-image `
+            --dest target/dist `
+            --vendor SeptThirteen `
+            --app-version ${{ github.ref_name }}-${{ github.run_number }} `
+            --win-console
+
+      - name: Create ZIP archive
+        run: |
+          Compress-Archive -Path target/dist/MinPad -DestinationPath target/MinPad-portable.zip
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minpad-exe-portable
+          path: target/MinPad-portable.zip
+          retention-days: 30
+
+  # 发布到 Release（仅在推送标签时）
+  release:
+    needs: [build-jar, build-exe]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    name: Create Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: minpad-jar
+          path: ./artifacts
+
+      - name: Download EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: minpad-exe-portable
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/minpad.jar
+            artifacts/MinPad-portable.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

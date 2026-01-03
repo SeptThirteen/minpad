@@ -176,15 +176,17 @@ public class SystemTrayManager {
      */
     private void showAbout() {
         String message = "MinPad - 数字键盘快捷工具\n\n" +
-                        "版本: 1.0\n" +
-                        "使用数字键盘快速执行常用操作\n\n" +
-                        "默认快捷键:\n" +
-                        "NumPad 1 - 打开记事本\n" +
-                        "NumPad 2 - 打开计算器\n" +
-                        "NumPad 3 - 打开浏览器\n" +
-                        "NumPad 4 - 打开资源管理器\n" +
-                        "NumPad 5 - 打开命令提示符\n" +
-                        "NumPad 0 - 显示测试通知";
+                        "版本: 1.0.1\n\n" +
+                        "一个轻量级的数字键盘快捷操作工具，\n" +
+                        "让您快速执行常用应用和操作。\n\n" +
+                        "功能特性:\n" +
+                        "✓ 自定义数字键盘快捷键\n" +
+                        "✓ 支持应用程序启动\n" +
+                        "✓ 支持系统快捷键组合\n" +
+                        "✓ 持久化配置保存\n\n" +
+                        "开发者: SeptThirteen\n" +
+                        "GitHub: github.com/SeptThirteen/minpad\n" +
+                        "许可证: MIT License";
         
         JOptionPane.showMessageDialog(null, message, "关于 MinPad", JOptionPane.INFORMATION_MESSAGE);
     }
@@ -209,6 +211,10 @@ public class SystemTrayManager {
             if (keyboardHook != null) {
                 keyboardHook.stop();
             }
+            
+            // 释放单实例锁
+            SingleInstanceLock.releaseLock();
+            
             System.exit(0);
         }
     }

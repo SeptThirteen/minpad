@@ -7,7 +7,7 @@
 
     <groupId>com.minpad</groupId>
     <artifactId>minpad</artifactId>
-    <version>1.0.1</version>
+    <version>1.1.2</version>
     <packaging>jar</packaging>
 
     <name>MinPad</name>
@@ -88,6 +88,47 @@
                                     </excludes>
                                 </filter>
                             </filters>
+                            <finalName>minpad</finalName>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Maven Exec Plugin - 用于运行 jpackage -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>jpackage</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>jpackage</executable>
+                            <arguments>
+                                <argument>--input</argument>
+                                <argument>${project.build.directory}</argument>
+                                <argument>--name</argument>
+                                <argument>MinPad</argument>
+                                <argument>--main-jar</argument>
+                                <argument>minpad.jar</argument>
+                                <argument>--main-class</argument>
+                                <argument>com.minpad.Main</argument>
+                                <argument>--type</argument>
+                                <argument>exe</argument>
+                                <argument>--dest</argument>
+                                <argument>${project.build.directory}/dist</argument>
+                                <argument>--win-console</argument>
+                                <argument>--vendor</argument>
+                                <argument>SeptThirteen</argument>
+                                <argument>--app-version</argument>
+                                <argument>${project.version}</argument>
+                                <argument>--win-per-user-install</argument>
+                            </arguments>
+                            <skip>true</skip>
                         </configuration>
                     </execution>
                 </executions>
