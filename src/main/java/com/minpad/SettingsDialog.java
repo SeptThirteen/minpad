@@ -2,9 +2,11 @@ package com.minpad;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -61,6 +63,18 @@ public class SettingsDialog extends JDialog {
         bottomPanel.add(hintLabel, BorderLayout.CENTER);
         
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        // 导出按钮
+        JButton exportButton = new JButton("导出配置");
+        exportButton.addActionListener(e -> exportConfig());
+        buttonPanel.add(exportButton);
+        
+        // 导入按钮
+        JButton importButton = new JButton("导入配置");
+        importButton.addActionListener(e -> importConfig());
+        buttonPanel.add(importButton);
+        
+        // 关闭按钮
         JButton closeButton = new JButton("关闭");
         closeButton.addActionListener(e -> dispose());
         buttonPanel.add(closeButton);
@@ -429,5 +443,81 @@ public class SettingsDialog extends JDialog {
                 "已重置为默认" + feature + "功能！",
                 "重置成功",
                 JOptionPane.INFORMATION_MESSAGE);
+    }
+    
+    /**
+     * 导出配置
+     */
+    private void exportConfig() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setSelectedFile(new java.io.File("MinPad-config.json"));
+        fileChooser.setDialogTitle("导出配置文件");
+        
+        int result = fileChooser.showSaveDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            String exportPath = fileChooser.getSelectedFile().getAbsolutePath();
+            
+            // 确保文件以 .json 结尾
+            if (!exportPath.endsWith(".json")) {
+                exportPath += ".json";
+            }
+            
+            if (ConfigManager.exportConfig(exportPath)) {
+                JOptionPane.showMessageDialog(this,
+                        "配置已成功导出到:\n" + exportPath,
+                        "导出成功",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "导出配置失败，请检查文件权限",
+                        "导出失败",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * 导入配置
+     */
+    private void importConfig() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setDialogTitle("选择配置文件进行导入");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("JSON 配置文件 (*.json)", "json"));
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            String importPath = fileChooser.getSelectedFile().getAbsolutePath();
+            
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "确定要导入此配置吗？\n这将覆盖当前的所有配置。\n\n文件: " + fileChooser.getSelectedFile().getName(),
+                    "确认导入",
+                    JOptionPane.YES_NO_OPTION);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                if (ConfigManager.importConfig(importPath)) {
+                    JOptionPane.showMessageDialog(this,
+                            "配置已成功导入！\n程序需要重新启动以应用新配置。",
+                            "导入成功",
+                            JOptionPane.INFORMATION_MESSAGE);
+                    
+                    // 建议用户重启应用
+                    int restart = JOptionPane.showConfirmDialog(this,
+                            "是否立即重启应用以应用新配置？",
+                            "重启应用",
+                            JOptionPane.YES_NO_OPTION);
+                    
+                    if (restart == JOptionPane.YES_OPTION) {
+                        System.exit(0);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "导入配置失败！\n请检查文件是否有效或文件权限。",
+                            "导入失败",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
     }
 }

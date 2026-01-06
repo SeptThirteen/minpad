@@ -176,7 +176,7 @@ public class SystemTrayManager {
      */
     private void showAbout() {
         String message = "MinPad - 数字键盘快捷工具\n\n" +
-                        "版本: 1.0.1\n\n" +
+                        "版本: 1.1.2\n\n" +
                         "一个轻量级的数字键盘快捷操作工具，\n" +
                         "让您快速执行常用应用和操作。\n\n" +
                         "功能特性:\n" +

@@ -140,4 +140,61 @@ public class ConfigManager {
             System.err.println("删除配置失败: " + e.getMessage());
         }
     }
+    
+    /**
+     * 导出配置到指定文件
+     */
+    public static boolean exportConfig(String exportPath) {
+        try {
+            Path configPath = Paths.get(CONFIG_FILE);
+            if (!Files.exists(configPath)) {
+                System.err.println("配置文件不存在，无法导出");
+                return false;
+            }
+            
+            // 读取当前配置并写入到目标位置
+            String configContent = new String(Files.readAllBytes(configPath), "UTF-8");
+            Files.write(Paths.get(exportPath), configContent.getBytes("UTF-8"));
+            
+            System.out.println("配置已导出到: " + exportPath);
+            return true;
+        } catch (IOException e) {
+            System.err.println("导出配置失败: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * 从指定文件导入配置
+     */
+    public static boolean importConfig(String importPath) {
+        try {
+            Path importFilePath = Paths.get(importPath);
+            if (!Files.exists(importFilePath)) {
+                System.err.println("导入文件不存在: " + importPath);
+                return false;
+            }
+            
+            // 验证文件是否是有效的 JSON
+            String content = new String(Files.readAllBytes(importFilePath), "UTF-8");
+            gson.fromJson(content, JsonObject.class);
+            
+            // 确保配置目录存在
+            Files.createDirectories(Paths.get(CONFIG_DIR));
+            
+            // 将导入的配置写入到默认位置
+            Files.write(Paths.get(CONFIG_FILE), content.getBytes("UTF-8"));
+            
+            System.out.println("配置已导入: " + CONFIG_FILE);
+            return true;
+        } catch (IOException e) {
+            System.err.println("导入配置失败: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        } catch (Exception e) {
+            System.err.println("导入文件格式错误: " + e.getMessage());
+            return false;
+        }
+    }
 }
