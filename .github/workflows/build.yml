@@ -33,10 +33,11 @@ jobs:
           path: target/minpad.jar
           retention-days: 30
 
-  # Windows 构建：生成便携版 app-image
+  # Windows 构建：生成便携版 app-image（仅在标签推送时）
   build-portable:
     runs-on: windows-latest
     name: Build Portable App-Image (Windows)
+    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - name: Checkout
