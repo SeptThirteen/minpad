@@ -53,28 +53,20 @@ jobs:
         run: mvn -B clean package -DskipTests
 
       - name: Generate app-image with jpackage
-        run: |
-          jpackage --input target `
-            --name MinPad `
-            --main-jar minpad.jar `
-            --main-class com.minpad.Main `
-            --type app-image `
-            --dest target/dist `
-            --vendor SeptThirteen `
-            --app-version 1.1.4
+        run: jpackage --input target --name MinPad --main-jar minpad.jar --main-class com.minpad.Main --type app-image --dest target/dist --vendor SeptThirteen --app-version "${{ github.ref_name }}"
 
       - name: Create ZIP archive
         shell: powershell
         run: |
-          cd target/dist
-          Compress-Archive -Path MinPad -DestinationPath MinPad-1.1.4-portable.zip -Force
-          cd ../..
+          $version = "${{ github.ref_name }}"
+          $zipName = "MinPad-${version}-portable.zip"
+          Compress-Archive -Path target/dist/MinPad -DestinationPath "target/dist/${zipName}" -Force
 
       - name: Upload portable ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: minpad-portable-zip
-          path: target/dist/MinPad-1.1.4-portable.zip
+          path: target/dist/MinPad-*.zip
           retention-days: 30
 
   # 发布到 Release（仅在推送标签时）
@@ -105,7 +97,7 @@ jobs:
         with:
           files: |
             artifacts/minpad.jar
-            artifacts/MinPad-1.1.4-portable.zip
+            artifacts/MinPad-*.zip
           draft: false
           prerelease: false
           generate_release_notes: true
