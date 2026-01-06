@@ -33,10 +33,10 @@ jobs:
           path: target/minpad.jar
           retention-days: 30
 
-  # Windows 构建：生成 exe 可执行程序
-  build-exe:
+  # Windows 构建：生成便携版 app-image
+  build-portable:
     runs-on: windows-latest
-    name: Build EXE (Windows)
+    name: Build Portable App-Image (Windows)
 
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
       - name: Build JAR with Maven
         run: mvn -B clean package -DskipTests
 
-      - name: Generate executable with jpackage
+      - name: Generate app-image with jpackage
         run: |
           jpackage --input target `
             --name MinPad `
@@ -61,23 +61,25 @@ jobs:
             --type app-image `
             --dest target/dist `
             --vendor SeptThirteen `
-            --app-version ${{ github.ref_name }}-${{ github.run_number }} `
-            --win-console
+            --app-version 1.1.4
 
       - name: Create ZIP archive
+        shell: powershell
         run: |
-          Compress-Archive -Path target/dist/MinPad -DestinationPath target/MinPad-portable.zip
+          cd target/dist
+          Compress-Archive -Path MinPad -DestinationPath MinPad-1.1.4-portable.zip -Force
+          cd ../..
 
-      - name: Upload EXE artifact
+      - name: Upload portable ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: minpad-exe-portable
-          path: target/MinPad-portable.zip
+          name: minpad-portable-zip
+          path: target/dist/MinPad-1.1.4-portable.zip
           retention-days: 30
 
   # 发布到 Release（仅在推送标签时）
   release:
-    needs: [build-jar, build-exe]
+    needs: [build-jar, build-portable]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     name: Create Release
@@ -92,10 +94,10 @@ jobs:
           name: minpad-jar
           path: ./artifacts
 
-      - name: Download EXE
+      - name: Download Portable ZIP
         uses: actions/download-artifact@v4
         with:
-          name: minpad-exe-portable
+          name: minpad-portable-zip
           path: ./artifacts
 
       - name: Create Release
@@ -103,7 +105,7 @@ jobs:
         with:
           files: |
             artifacts/minpad.jar
-            artifacts/MinPad-portable.zip
+            artifacts/MinPad-1.1.4-portable.zip
           draft: false
           prerelease: false
           generate_release_notes: true
