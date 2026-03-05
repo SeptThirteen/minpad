@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 
@@ -19,10 +18,13 @@ public class SystemTrayManager {
     private KeyboardHook keyboardHook;
     private JPopupMenu swingMenu;
     private JWindow popupWindow;
+    private PopupMenuListener popupCloseListener;
+    private final ThemeManager.ThemeChangeListener themeChangeListener;
     
     public SystemTrayManager(NumPadListener listener, KeyboardHook keyboardHook) {
         this.listener = listener;
         this.keyboardHook = keyboardHook;
+        this.themeChangeListener = (requestedMode, effectiveMode) -> refreshTrayTheme();
     }
     
     /**
@@ -65,6 +67,7 @@ public class SystemTrayManager {
             trayIcon.addActionListener(e -> showSettings());
             
             tray.add(trayIcon);
+            ThemeManager.addThemeChangeListener(themeChangeListener);
             
             // 显示启动通知
             trayIcon.displayMessage("MinPad", 
@@ -115,14 +118,23 @@ public class SystemTrayManager {
         JPopupMenu menu = new JPopupMenu();
         Font popupFont = pickFont();
         menu.setFont(popupFont);
+        menu.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
 
         JMenuItem settingsItem = new JMenuItem("设置快捷键...");
         settingsItem.setFont(popupFont);
+        settingsItem.setIcon(IconFactory.createMenuItemIcon('\uE713'));
         settingsItem.addActionListener(e -> showSettings());
         menu.add(settingsItem);
 
+        JMenu appearanceMenu = new JMenu("外观");
+        appearanceMenu.setFont(popupFont);
+        appearanceMenu.setIcon(IconFactory.createMenuItemIcon('\uE706'));
+        addThemeMenuItems(appearanceMenu, popupFont);
+        menu.add(appearanceMenu);
+
         JMenuItem aboutItem = new JMenuItem("关于");
         aboutItem.setFont(popupFont);
+        aboutItem.setIcon(IconFactory.createMenuItemIcon('\uE946'));
         aboutItem.addActionListener(e -> showAbout());
         menu.add(aboutItem);
 
@@ -130,33 +142,86 @@ public class SystemTrayManager {
 
         JMenuItem exitItem = new JMenuItem("退出");
         exitItem.setFont(popupFont);
+        exitItem.setIcon(IconFactory.createMenuItemIcon('\uE8BB'));
         exitItem.addActionListener(e -> exit());
         menu.add(exitItem);
 
         return menu;
     }
 
+    private void addThemeMenuItems(JMenu appearanceMenu, Font popupFont) {
+        ButtonGroup group = new ButtonGroup();
+
+        JRadioButtonMenuItem systemItem = new JRadioButtonMenuItem("跟随系统");
+        systemItem.setFont(popupFont);
+        systemItem.addActionListener(e -> applyThemeFromTray(ThemeManager.ThemeMode.SYSTEM));
+        group.add(systemItem);
+        appearanceMenu.add(systemItem);
+
+        JRadioButtonMenuItem lightItem = new JRadioButtonMenuItem("浅色");
+        lightItem.setFont(popupFont);
+        lightItem.addActionListener(e -> applyThemeFromTray(ThemeManager.ThemeMode.LIGHT));
+        group.add(lightItem);
+        appearanceMenu.add(lightItem);
+
+        JRadioButtonMenuItem darkItem = new JRadioButtonMenuItem("深色");
+        darkItem.setFont(popupFont);
+        darkItem.addActionListener(e -> applyThemeFromTray(ThemeManager.ThemeMode.DARK));
+        group.add(darkItem);
+        appearanceMenu.add(darkItem);
+
+        ThemeManager.ThemeMode mode = ThemeManager.getCurrentMode();
+        if (mode == ThemeManager.ThemeMode.LIGHT) {
+            lightItem.setSelected(true);
+        } else if (mode == ThemeManager.ThemeMode.DARK) {
+            darkItem.setSelected(true);
+        } else {
+            systemItem.setSelected(true);
+        }
+    }
+
+    private void applyThemeFromTray(ThemeManager.ThemeMode mode) {
+        SwingUtilities.invokeLater(() -> {
+            ThemeManager.applyTheme(mode, true);
+        });
+    }
+
+    private void refreshTrayTheme() {
+        if (trayIcon != null) {
+            trayIcon.setImage(createTrayIcon());
+        }
+        swingMenu = createSwingMenu();
+    }
+
     private void showSwingMenu(int x, int y) {
         SwingUtilities.invokeLater(() -> {
-            if (swingMenu == null || popupWindow == null) {
+            if (popupWindow == null) {
                 return;
+            }
+            swingMenu = createSwingMenu();
+            if (trayIcon != null) {
+                trayIcon.setImage(createTrayIcon());
             }
             popupWindow.setLocation(x, y);
             popupWindow.setVisible(true);
-            swingMenu.addPopupMenuListener(new PopupMenuListener() {
-                @Override
-                public void popupMenuWillBecomeVisible(PopupMenuEvent e) { }
+            if (popupCloseListener == null) {
+                popupCloseListener = new PopupMenuListener() {
+                    @Override
+                    public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                    }
 
-                @Override
-                public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                    popupWindow.setVisible(false);
-                }
+                    @Override
+                    public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                        popupWindow.setVisible(false);
+                    }
 
-                @Override
-                public void popupMenuCanceled(PopupMenuEvent e) {
-                    popupWindow.setVisible(false);
-                }
-            });
+                    @Override
+                    public void popupMenuCanceled(PopupMenuEvent e) {
+                        popupWindow.setVisible(false);
+                    }
+                };
+            }
+            swingMenu.addPopupMenuListener(popupCloseListener);
             swingMenu.show(popupWindow.getContentPane(), 0, 0);
         });
     }
@@ -187,18 +252,15 @@ public class SystemTrayManager {
                         "开发者: SeptThirteen\n" +
                         "GitHub: github.com/SeptThirteen/minpad\n" +
                         "许可证: MIT License";
-        
-        JOptionPane.showMessageDialog(null, message, "关于 MinPad", JOptionPane.INFORMATION_MESSAGE);
+
+        FluentDialogs.info(null, "关于 MinPad", message);
     }
     
     /**
      * 退出程序
      */
     private void exit() {
-        int result = JOptionPane.showConfirmDialog(null,
-                "确定要退出 MinPad 吗？",
-                "确认退出",
-                JOptionPane.YES_NO_OPTION);
+        int result = FluentDialogs.yesNo(null, "确认退出", "确定要退出 MinPad 吗？");
         
         if (result == JOptionPane.YES_OPTION) {
             // 保存配置
@@ -207,6 +269,7 @@ public class SystemTrayManager {
             if (trayIcon != null) {
                 SystemTray.getSystemTray().remove(trayIcon);
             }
+            ThemeManager.removeThemeChangeListener(themeChangeListener);
             listener.stop();
             if (keyboardHook != null) {
                 keyboardHook.stop();

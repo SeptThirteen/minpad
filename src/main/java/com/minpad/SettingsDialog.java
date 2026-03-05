@@ -2,13 +2,14 @@ package com.minpad;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.File;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.HashMap;
 import java.util.Map;
+import javax.swing.Timer;
 
 /**
  * 设置对话框
@@ -19,14 +20,20 @@ public class SettingsDialog extends JDialog {
     
     private ActionExecutor actionExecutor;
     private Map<Integer, JButton> keyButtons = new HashMap<>();
-    
-    // 颜色定义
-    private static final Color CONFIGURED_COLOR = new Color(41, 98, 255);  // 深蓝色
-    private static final Color UNCONFIGURED_COLOR = new Color(189, 189, 189);  // 灰色
-    private static final Color HOVER_COLOR = new Color(100, 149, 237);  // 悬停时的蓝色
+    private JComboBox<String> themeCombo;
+    private boolean themeComboSyncing;
+    private final ThemeManager.ThemeChangeListener themeChangeListener;
     
     public SettingsDialog(ActionExecutor actionExecutor) {
         this.actionExecutor = actionExecutor;
+        this.themeChangeListener = (requestedMode, effectiveMode) -> {
+            if (!isDisplayable()) {
+                return;
+            }
+            SwingUtilities.updateComponentTreeUI(this);
+            syncThemeCombo();
+            refreshButtonColors();
+        };
         
         setTitle("MinPad - 快捷键设置");
         setSize(500, 450);
@@ -35,16 +42,23 @@ public class SettingsDialog extends JDialog {
         setIconImage(createSettingsIcon());
         
         initUI();
+        ThemeManager.addThemeChangeListener(themeChangeListener);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                ThemeManager.removeThemeChangeListener(themeChangeListener);
+            }
+        });
     }
     
     private void initUI() {
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
-        mainPanel.setBackground(new Color(245, 245, 245));
+        mainPanel.setBackground(UIManager.getColor("Panel.background"));
         
         // 标题
         JLabel titleLabel = new JLabel("数字键盘快捷键配置");
-        titleLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 16));
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16f));
         titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         
@@ -54,7 +68,7 @@ public class SettingsDialog extends JDialog {
         
         // 提示信息
         JLabel hintLabel = new JLabel("双击按键编辑配置 | 悬停查看详情");
-        hintLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 11));
+        hintLabel.setFont(hintLabel.getFont().deriveFont(Font.PLAIN, 11f));
         hintLabel.setForeground(Color.GRAY);
         hintLabel.setHorizontalAlignment(SwingConstants.CENTER);
         
@@ -63,6 +77,22 @@ public class SettingsDialog extends JDialog {
         bottomPanel.add(hintLabel, BorderLayout.CENTER);
         
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        JPanel appearancePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        appearancePanel.add(new JLabel("外观:"));
+        themeCombo = new JComboBox<>(new String[]{"跟随系统", "浅色", "深色"});
+        themeCombo.setSelectedIndex(toThemeComboIndex(ThemeManager.getCurrentMode()));
+        themeCombo.addActionListener(e -> {
+            if (themeComboSyncing) {
+                return;
+            }
+            ThemeManager.ThemeMode selectedMode = fromThemeComboIndex(themeCombo.getSelectedIndex());
+            ThemeManager.applyTheme(selectedMode, true);
+            SwingUtilities.updateComponentTreeUI(this);
+            refreshButtonColors();
+        });
+        appearancePanel.add(themeCombo);
+        bottomPanel.add(appearancePanel, BorderLayout.WEST);
         
         // 导出按钮
         JButton exportButton = new JButton("导出配置");
@@ -97,7 +127,7 @@ public class SettingsDialog extends JDialog {
      */
     private JPanel createKeyboardLayoutPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(new Color(245, 245, 245));
+        panel.setBackground(UIManager.getColor("Panel.background"));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(3, 3, 3, 3);
         gbc.fill = GridBagConstraints.BOTH;
@@ -168,7 +198,7 @@ public class SettingsDialog extends JDialog {
      */
     private JButton createDisabledKey(String label) {
         JButton button = new JButton(label);
-        button.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
+        button.setFont(button.getFont().deriveFont(Font.BOLD, 14f));
         button.setBackground(new Color(220, 220, 220));
         button.setForeground(Color.GRAY);
         button.setEnabled(false);
@@ -194,9 +224,10 @@ public class SettingsDialog extends JDialog {
             "</div></html>";
         
         JButton button = new JButton(buttonText);
-        button.setFont(new Font("Microsoft YaHei", Font.PLAIN, 11));
+        button.setFont(button.getFont().deriveFont(Font.PLAIN, 11f));
         button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
+        button.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        button.putClientProperty("JButton.buttonType", "roundRect");
         
         // 设置初始颜色
         updateButtonColor(button, action);
@@ -207,17 +238,34 @@ public class SettingsDialog extends JDialog {
         // 鼠标悬停效果
         button.addMouseListener(new MouseAdapter() {
             private Color originalColor;
+            private Color pressedColor;
             
             @Override
             public void mouseEntered(MouseEvent e) {
                 originalColor = button.getBackground();
-                button.setBackground(HOVER_COLOR);
+                animateBackground(button, getHoverColor());
             }
             
             @Override
             public void mouseExited(MouseEvent e) {
                 if (originalColor != null) {
-                    button.setBackground(originalColor);
+                    animateBackground(button, originalColor);
+                }
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                pressedColor = darken(button.getBackground(), 0.12f);
+                animateBackground(button, pressedColor);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), button);
+                if (button.contains(p)) {
+                    animateBackground(button, getHoverColor());
+                } else if (originalColor != null) {
+                    animateBackground(button, originalColor);
                 }
             }
             
@@ -238,13 +286,124 @@ public class SettingsDialog extends JDialog {
      */
     private void updateButtonColor(JButton button, ActionExecutor.ActionConfig action) {
         if (action != null) {
-            button.setBackground(CONFIGURED_COLOR);
+            button.setBackground(getConfiguredColor());
             button.setForeground(Color.WHITE);
             button.setOpaque(true);
         } else {
-            button.setBackground(UNCONFIGURED_COLOR);
+            button.setBackground(getUnconfiguredColor());
             button.setForeground(Color.DARK_GRAY);
             button.setOpaque(true);
+        }
+    }
+
+    private void refreshButtonColors() {
+        for (Map.Entry<Integer, JButton> entry : keyButtons.entrySet()) {
+            ActionExecutor.ActionConfig action = actionExecutor.getAction(entry.getKey());
+            updateButtonColor(entry.getValue(), action);
+        }
+    }
+
+    private Color getConfiguredColor() {
+        Color accent = UIManager.getColor("Component.focusColor");
+        return accent != null ? accent : new Color(41, 98, 255);
+    }
+
+    private Color getUnconfiguredColor() {
+        Color buttonBg = UIManager.getColor("Button.background");
+        if (buttonBg != null) {
+            return buttonBg;
+        }
+        return new Color(189, 189, 189);
+    }
+
+    private Color getHoverColor() {
+        Color hover = UIManager.getColor("Button.hoverBackground");
+        if (hover != null) {
+            return hover;
+        }
+        return getConfiguredColor().brighter();
+    }
+
+    private void animateBackground(JButton button, Color target) {
+        Object oldTimer = button.getClientProperty("hoverTimer");
+        if (oldTimer instanceof Timer) {
+            ((Timer) oldTimer).stop();
+        }
+
+        Color start = button.getBackground();
+        final int steps = 8;
+        final int delayMs = 15;
+
+        Timer timer = new Timer(delayMs, null);
+        timer.addActionListener(e -> {
+            Integer stepObj = (Integer) button.getClientProperty("hoverStep");
+            int step = stepObj == null ? 0 : stepObj;
+            step++;
+
+            float t = Math.min(1f, step / (float) steps);
+            button.setBackground(blend(start, target, t));
+            button.putClientProperty("hoverStep", step);
+
+            if (step >= steps) {
+                timer.stop();
+                button.setBackground(target);
+                button.putClientProperty("hoverStep", null);
+            }
+        });
+
+        button.putClientProperty("hoverStep", 0);
+        button.putClientProperty("hoverTimer", timer);
+        timer.start();
+    }
+
+    private Color blend(Color from, Color to, float t) {
+        int r = (int) (from.getRed() + (to.getRed() - from.getRed()) * t);
+        int g = (int) (from.getGreen() + (to.getGreen() - from.getGreen()) * t);
+        int b = (int) (from.getBlue() + (to.getBlue() - from.getBlue()) * t);
+        return new Color(r, g, b);
+    }
+
+    private Color darken(Color color, float amount) {
+        float ratio = Math.max(0f, Math.min(1f, 1f - amount));
+        int r = Math.max(0, Math.round(color.getRed() * ratio));
+        int g = Math.max(0, Math.round(color.getGreen() * ratio));
+        int b = Math.max(0, Math.round(color.getBlue() * ratio));
+        return new Color(r, g, b);
+    }
+
+    private int toThemeComboIndex(ThemeManager.ThemeMode mode) {
+        if (mode == ThemeManager.ThemeMode.LIGHT) {
+            return 1;
+        }
+        if (mode == ThemeManager.ThemeMode.DARK) {
+            return 2;
+        }
+        return 0;
+    }
+
+    private ThemeManager.ThemeMode fromThemeComboIndex(int index) {
+        if (index == 1) {
+            return ThemeManager.ThemeMode.LIGHT;
+        }
+        if (index == 2) {
+            return ThemeManager.ThemeMode.DARK;
+        }
+        return ThemeManager.ThemeMode.SYSTEM;
+    }
+
+    private void syncThemeCombo() {
+        if (themeCombo == null) {
+            return;
+        }
+        int targetIndex = toThemeComboIndex(ThemeManager.getCurrentMode());
+        if (themeCombo.getSelectedIndex() == targetIndex) {
+            return;
+        }
+        themeComboSyncing = true;
+        try {
+            themeCombo.setSelectedIndex(targetIndex);
+        } finally {
+            themeComboSyncing = false;
         }
     }
     
@@ -280,14 +439,13 @@ public class SettingsDialog extends JDialog {
         if (keyIndex == 10 || keyIndex == 11) {
             ActionExecutor.ActionConfig currentAction = actionExecutor.getAction(keyIndex);
             String currentName = currentAction != null ? currentAction.getName() : "未设置";
-            int option = JOptionPane.showConfirmDialog(this,
+            int option = FluentDialogs.yesNo(this,
+                "配置 " + keyLabel,
                     "是否使用默认的音量控制功能？\n\n" +
                     "当前功能: " + currentName + "\n" +
                     "NumPad + : 增加音量\n" +
                     "NumPad - : 减少音量\n\n" +
-                    "点击\"是\"使用音量控制，\"否\"自定义其他功能",
-                    "配置 " + keyLabel,
-                    JOptionPane.YES_NO_OPTION);
+                "点击\"是\"使用音量控制，\"否\"自定义其他功能");
             
             if (option == JOptionPane.YES_OPTION) {
                 resetToDefault(keyIndex, button);
@@ -296,13 +454,12 @@ public class SettingsDialog extends JDialog {
         } else if (keyIndex == 14) {
             ActionExecutor.ActionConfig currentAction = actionExecutor.getAction(keyIndex);
             String currentName = currentAction != null ? currentAction.getName() : "未设置";
-            int option = JOptionPane.showConfirmDialog(this,
+            int option = FluentDialogs.yesNo(this,
+                "配置 " + keyLabel,
                     "是否使用默认的播放/暂停功能？\n\n" +
                     "当前功能: " + currentName + "\n" +
                     "NumPad Enter: 播放/暂停音乐\n\n" +
-                    "点击\"是\"使用播放/暂停，\"否\"自定义其他功能",
-                    "配置 " + keyLabel,
-                    JOptionPane.YES_NO_OPTION);
+                "点击\"是\"使用播放/暂停，\"否\"自定义其他功能");
             
             if (option == JOptionPane.YES_OPTION) {
                 resetToDefault(keyIndex, button);
@@ -310,13 +467,14 @@ public class SettingsDialog extends JDialog {
             }
         }
         
-        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
+        JPanel panel = new JPanel(new GridLayout(4, 2, 12, 12));
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        panel.setBackground(UIManager.getColor("Panel.background"));
         
-        JTextField nameField = new JTextField();
-        JTextField commandField = new JTextField();
-        JTextField argumentField = new JTextField();
-        JTextField keyComboField = new JTextField();
+        JTextField nameField = createFluentTextField("例如: 打开记事本");
+        JTextField commandField = createFluentTextField("例如: notepad.exe");
+        JTextField argumentField = createFluentTextField("可选参数");
+        JTextField keyComboField = createFluentTextField("例如: ctrl+shift+a");
         
         // 如果已有配置，填充现有值
         ActionExecutor.ActionConfig existingAction = actionExecutor.getAction(keyIndex);
@@ -333,17 +491,18 @@ public class SettingsDialog extends JDialog {
             }
         }
         
-        panel.add(new JLabel("名称:"));
+        panel.add(createFormLabel("名称:"));
         panel.add(nameField);
-        panel.add(new JLabel("命令:"));
+        panel.add(createFormLabel("命令:"));
         panel.add(commandField);
-        panel.add(new JLabel("参数:"));
+        panel.add(createFormLabel("参数:"));
         panel.add(argumentField);
-        panel.add(new JLabel("组合键 (如 ctrl+shift+a):"));
+        panel.add(createFormLabel("组合键 (如 ctrl+shift+a):"));
         panel.add(keyComboField);
         
         JPanel infoPanel = new JPanel(new BorderLayout());
         infoPanel.setBorder(new EmptyBorder(5, 0, 0, 0));
+        infoPanel.setBackground(UIManager.getColor("Panel.background"));
         JLabel infoLabel = new JLabel(
             "<html>按键说明:<br>" +
             "• 修饰键: ctrl/control, shift, alt, win/windows<br>" +
@@ -355,10 +514,10 @@ public class SettingsDialog extends JDialog {
             "• 函数键: f1-f12<br>" +
             "例如: ctrl+s, shift+f5, alt+tab, ctrl+shift+comma</html>"
         );
-        infoLabel.setFont(new Font("Microsoft YaHei", Font.PLAIN, 11));
+        infoLabel.setFont(infoLabel.getFont().deriveFont(Font.PLAIN, 11f));
         infoPanel.add(infoLabel, BorderLayout.CENTER);
         
-        int result = JOptionPane.showConfirmDialog(this, 
+        int result = FluentDialogs.confirm(this,
             new Object[]{panel, infoPanel},
             "编辑 " + keyLabel + " 快捷键",
             JOptionPane.OK_CANCEL_OPTION,
@@ -391,17 +550,25 @@ public class SettingsDialog extends JDialog {
                 updateButtonColor(button, newAction);
                 updateButtonTooltip(button, keyIndex, keyLabel, newAction);
                 
-                JOptionPane.showMessageDialog(this,
-                    "快捷键配置已更新并保存！",
-                    "成功",
-                    JOptionPane.INFORMATION_MESSAGE);
+                FluentDialogs.info(this, "成功", "快捷键配置已更新并保存！");
             } else {
-                JOptionPane.showMessageDialog(this,
-                    "名称不能为空，且命令和组合键至少填一个！",
-                    "错误",
-                    JOptionPane.ERROR_MESSAGE);
+                FluentDialogs.error(this, "错误", "名称不能为空，且命令和组合键至少填一个！");
             }
         }
+    }
+
+    private JLabel createFormLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(label.getFont().deriveFont(Font.PLAIN, 12f));
+        return label;
+    }
+
+    private JTextField createFluentTextField(String placeholder) {
+        JTextField textField = new JTextField();
+        textField.putClientProperty("JTextField.placeholderText", placeholder);
+        textField.putClientProperty("JComponent.roundRect", Boolean.TRUE);
+        textField.setPreferredSize(new Dimension(220, 30));
+        return textField;
     }
     
     /**
@@ -439,10 +606,7 @@ public class SettingsDialog extends JDialog {
         updateButtonTooltip(button, keyIndex, keyLabel, defaultAction);
         
         String feature = keyIndex == 14 ? "播放/暂停" : "音量控制";
-        JOptionPane.showMessageDialog(this,
-                "已重置为默认" + feature + "功能！",
-                "重置成功",
-                JOptionPane.INFORMATION_MESSAGE);
+        FluentDialogs.info(this, "重置成功", "已重置为默认" + feature + "功能！");
     }
     
     /**
@@ -464,15 +628,9 @@ public class SettingsDialog extends JDialog {
             }
             
             if (ConfigManager.exportConfig(exportPath)) {
-                JOptionPane.showMessageDialog(this,
-                        "配置已成功导出到:\n" + exportPath,
-                        "导出成功",
-                        JOptionPane.INFORMATION_MESSAGE);
+                FluentDialogs.info(this, "导出成功", "配置已成功导出到:\n" + exportPath);
             } else {
-                JOptionPane.showMessageDialog(this,
-                        "导出配置失败，请检查文件权限",
-                        "导出失败",
-                        JOptionPane.ERROR_MESSAGE);
+                FluentDialogs.error(this, "导出失败", "导出配置失败，请检查文件权限");
             }
         }
     }
@@ -490,32 +648,23 @@ public class SettingsDialog extends JDialog {
         if (result == JFileChooser.APPROVE_OPTION) {
             String importPath = fileChooser.getSelectedFile().getAbsolutePath();
             
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "确定要导入此配置吗？\n这将覆盖当前的所有配置。\n\n文件: " + fileChooser.getSelectedFile().getName(),
+            int confirm = FluentDialogs.yesNo(
+                    this,
                     "确认导入",
-                    JOptionPane.YES_NO_OPTION);
+                    "确定要导入此配置吗？\n这将覆盖当前的所有配置。\n\n文件: " + fileChooser.getSelectedFile().getName());
             
             if (confirm == JOptionPane.YES_OPTION) {
                 if (ConfigManager.importConfig(importPath)) {
-                    JOptionPane.showMessageDialog(this,
-                            "配置已成功导入！\n程序需要重新启动以应用新配置。",
-                            "导入成功",
-                            JOptionPane.INFORMATION_MESSAGE);
+                    FluentDialogs.info(this, "导入成功", "配置已成功导入！\n程序需要重新启动以应用新配置。");
                     
                     // 建议用户重启应用
-                    int restart = JOptionPane.showConfirmDialog(this,
-                            "是否立即重启应用以应用新配置？",
-                            "重启应用",
-                            JOptionPane.YES_NO_OPTION);
+                    int restart = FluentDialogs.yesNo(this, "重启应用", "是否立即重启应用以应用新配置？");
                     
                     if (restart == JOptionPane.YES_OPTION) {
                         System.exit(0);
                     }
                 } else {
-                    JOptionPane.showMessageDialog(this,
-                            "导入配置失败！\n请检查文件是否有效或文件权限。",
-                            "导入失败",
-                            JOptionPane.ERROR_MESSAGE);
+                    FluentDialogs.error(this, "导入失败", "导入配置失败！\n请检查文件是否有效或文件权限。");
                 }
             }
         }

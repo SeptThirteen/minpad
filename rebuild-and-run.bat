@@ -10,7 +10,7 @@ mvn clean package -q
 
 if %ERRORLEVEL% EQU 0 (
     echo 编译成功！正在启动...
-    start /B javaw -jar target\minpad-1.0.0.jar
+    start /B javaw -jar target\minpad.jar
     echo MinPad 已启动，请查看系统托盘
 ) else (
     echo 编译失败！

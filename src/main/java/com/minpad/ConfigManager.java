@@ -3,7 +3,6 @@ package com.minpad;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonElement;
 
 import java.io.*;
 import java.nio.file.*;
@@ -16,6 +15,7 @@ import java.util.*;
 public class ConfigManager {
     private static final String CONFIG_DIR = System.getProperty("user.home") + File.separator + ".minpad";
     private static final String CONFIG_FILE = CONFIG_DIR + File.separator + "config.json";
+    private static final String DEFAULT_THEME_MODE = "system";
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     
     /**
@@ -26,8 +26,11 @@ public class ConfigManager {
             // 确保配置目录存在
             Files.createDirectories(Paths.get(CONFIG_DIR));
             
-            // 构建 JSON 配置
-            JsonObject configJson = new JsonObject();
+            // 保留已有全局设置（如主题模式）
+            JsonObject configJson = readConfigJson();
+            if (configJson == null) {
+                configJson = new JsonObject();
+            }
             JsonObject actionsJson = new JsonObject();
             
             for (Map.Entry<Integer, ActionExecutor.ActionConfig> entry : actionMap.entrySet()) {
@@ -49,12 +52,14 @@ public class ConfigManager {
             }
             
             configJson.add("actions", actionsJson);
+            if (!configJson.has("themeMode")) {
+                configJson.addProperty("themeMode", DEFAULT_THEME_MODE);
+            }
             configJson.addProperty("version", "1.0.0");
             configJson.addProperty("lastModified", System.currentTimeMillis());
             
             // 写入文件
-            String json = gson.toJson(configJson);
-            Files.write(Paths.get(CONFIG_FILE), json.getBytes("UTF-8"));
+            writeConfigJson(configJson);
             
             System.out.println("配置已保存: " + CONFIG_FILE);
         } catch (IOException e) {
@@ -196,5 +201,72 @@ public class ConfigManager {
             System.err.println("导入文件格式错误: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 获取主题模式（light/dark/system）
+     */
+    public static String getThemeMode() {
+        JsonObject configJson = readConfigJson();
+        if (configJson == null || !configJson.has("themeMode")) {
+            return DEFAULT_THEME_MODE;
+        }
+        return normalizeThemeMode(configJson.get("themeMode").getAsString());
+    }
+
+    /**
+     * 保存主题模式（light/dark/system）
+     */
+    public static void setThemeMode(String themeMode) {
+        try {
+            Files.createDirectories(Paths.get(CONFIG_DIR));
+
+            JsonObject configJson = readConfigJson();
+            if (configJson == null) {
+                configJson = new JsonObject();
+            }
+
+            configJson.addProperty("themeMode", normalizeThemeMode(themeMode));
+            if (!configJson.has("version")) {
+                configJson.addProperty("version", "1.0.0");
+            }
+            configJson.addProperty("lastModified", System.currentTimeMillis());
+
+            writeConfigJson(configJson);
+        } catch (IOException e) {
+            System.err.println("保存主题配置失败: " + e.getMessage());
+        }
+    }
+
+    private static String normalizeThemeMode(String value) {
+        if (value == null) {
+            return DEFAULT_THEME_MODE;
+        }
+
+        String mode = value.trim().toLowerCase(Locale.ROOT);
+        if ("light".equals(mode) || "dark".equals(mode) || "system".equals(mode)) {
+            return mode;
+        }
+        return DEFAULT_THEME_MODE;
+    }
+
+    private static JsonObject readConfigJson() {
+        try {
+            Path configPath = Paths.get(CONFIG_FILE);
+            if (!Files.exists(configPath)) {
+                return null;
+            }
+
+            String json = new String(Files.readAllBytes(configPath), "UTF-8");
+            return gson.fromJson(json, JsonObject.class);
+        } catch (Exception e) {
+            System.err.println("读取配置JSON失败: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static void writeConfigJson(JsonObject configJson) throws IOException {
+        String json = gson.toJson(configJson);
+        Files.write(Paths.get(CONFIG_FILE), json.getBytes("UTF-8"));
     }
 }

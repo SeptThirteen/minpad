@@ -1,7 +1,6 @@
 package com.minpad;
 
 import javax.swing.*;
-import java.awt.*;
 
 /**
  * MinPad - 数字键盘快捷操作工具
@@ -9,9 +8,9 @@ import java.awt.*;
  */
 public class Main {
     public static void main(String[] args) {
-        // 设置系统外观
+        // 初始化 Fluent 风格主题
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            ThemeManager.initialize();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -19,12 +18,11 @@ public class Main {
         // 检查是否已有实例在运行
         if (!SingleInstanceLock.tryLock()) {
             // 直接在主线程显示对话框（阻塞）
-            JOptionPane.showMessageDialog(null,
+            FluentDialogs.info(null,
+                "MinPad - 提示",
                 "MinPad 已经在运行中！\n\n" +
                 "请在系统托盘中找到 MinPad 图标进行操作。\n" +
-                "如需退出，请右键托盘图标选择退出。",
-                "MinPad - 提示",
-                JOptionPane.INFORMATION_MESSAGE);
+                "如需退出，请右键托盘图标选择退出。");
             System.exit(0);
             return;
         }
@@ -43,10 +41,9 @@ public class Main {
                 System.out.println("MinPad 已启动，监听数字键盘...");
             } catch (Exception e) {
                 e.printStackTrace();
-                JOptionPane.showMessageDialog(null, 
-                    "启动失败: " + e.getMessage(), 
-                    "错误", 
-                    JOptionPane.ERROR_MESSAGE);
+                FluentDialogs.error(null,
+                    "错误",
+                    "启动失败: " + e.getMessage());
                 SingleInstanceLock.releaseLock();
                 System.exit(1);
             }
